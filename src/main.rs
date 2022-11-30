@@ -1,3 +1,11 @@
+//! # latex-thebib
+//! This software takes care of legacy latex documents using "thebibliography".
+//! It sorts, deduplicates and finds missing entries.
+//! 
+//! Run it as `latex-thebib -h` for help.
+//! 
+//! Run it as `latex-thebib -f master.tex` for basic functionality.
+
 use clap::Parser;
 use regex::{Regex, RegexBuilder};
 use std::collections::{HashMap, HashSet};
@@ -7,13 +15,16 @@ use std::path::PathBuf;
 const STR_PROTECT: &str = "@#[[3G3H498FG297EGF928HF2HRG82RHFOWKDNVKJSX]]@#*";
 
 #[derive(Parser, Debug)]
-#[command(author, version, about = "Biblio cleaner", long_about = None)]
+#[command(author, version, about)]
 struct Cli {
     #[arg(short, long)]
+    /// Master TeX file
     file: String,
     #[arg(short, long, default_value_t = 0.3)]
+    /// Threshold for finding duplicated entries
     threshold: f64,
     #[arg(short, long, default_value = "cleaned")]
+    /// Subdir of master-file to put all the outputs 
     subdir: String,
 }
 

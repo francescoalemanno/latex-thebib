@@ -2,8 +2,9 @@
 name = "latex-thebib"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT"
+description = "Clean and sort legacy latex bibliographies written using 'thebibliography', Francesco Alemanno (2022)"
+repository = "https://github.com/francescoalemanno/latex-thebib/tree/master"
 
 [dependencies]
 clap = { version = "4.0.26", features = ["derive"] }

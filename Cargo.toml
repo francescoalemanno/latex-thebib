@@ -1,9 +1,9 @@
 [package]
 name = "latex-thebib"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
-description = "Clean and sort legacy latex bibliographies written using 'thebibliography', Francesco Alemanno (2022)"
+description = "Clean and sort legacy TeX bibliographies written using 'thebibliography' via the `refactor` sub-command. Compile BibTeX files to legacy `thebibliography` TeX code using the `compile` sub-command. Francesco Alemanno (2022)"
 repository = "https://github.com/francescoalemanno/latex-thebib/tree/master"
 
 [dependencies]

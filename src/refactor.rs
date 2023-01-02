@@ -7,7 +7,7 @@
 //! Run it as `latex-thebib -f master.tex` for basic functionality.
 use crate::utils;
 use clap::Args;
-use regex::{Regex, RegexBuilder};
+use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::Hash;
@@ -161,7 +161,7 @@ fn apply_changes(fname: &str, bib: &Vec<BibEntry>, cite: &Vec<Cite>, options: &R
         contents = contents.replace(&v.raw, &format!("{}", v));
     }
 
-    let bre = thebibliography_regex();
+    let bre = find_thebibliography(&contents);
     let n = utils::thebibliography_size(bib.len());
 
     let bibstr = format!(
@@ -172,11 +172,11 @@ fn apply_changes(fname: &str, bib: &Vec<BibEntry>, cite: &Vec<Cite>, options: &R
             .collect::<Vec<String>>()
             .join("\n\n")
     );
-
-    contents = bre
-        .replace(&contents, utils::STR_PROTECT)
-        .to_string()
-        .replace(utils::STR_PROTECT, &bibstr);
+    let mut ncontents = contents.to_owned();
+    for b in bre.iter() {
+        ncontents = ncontents.replace(b, &bibstr);
+    }
+    contents = ncontents;
 
     utils::write_file(n_fname, &contents);
 
@@ -300,13 +300,11 @@ fn change_path<'a>(path: &'a str, add: &'a str) -> Option<String> {
 }
 
 fn parse_bibliography(contents: &str) -> Vec<BibEntry> {
-    let re = thebibliography_regex();
     let re2 = Regex::new(r"\{(.*?)\}(.*)").unwrap();
-    let bib = re.captures(&contents);
+    let bib = find_thebibliography(contents);
     let mut res: Vec<BibEntry> = vec![];
-    if let Some(bib) = bib {
-        let bib = bib["bib"].to_owned();
-        for s in bib.split("\\bibitem").into_iter() {
+    for bibm in bib.iter() {
+        for s in get_bibitems(bibm).split("\\bibitem").into_iter() {
             let st = s.trim().replace("\n", "");
             let cp = re2.captures(&st);
             if let Some(captured) = cp {
@@ -320,10 +318,32 @@ fn parse_bibliography(contents: &str) -> Vec<BibEntry> {
     return res;
 }
 
-fn thebibliography_regex() -> Regex {
-    return RegexBuilder::new(
-        r"(?s)\\begin\{thebibliography\}(\{\d+\}|)(?P<bib>.*?)\\end\{thebibliography\}",
-    )
-    .build()
-    .unwrap();
+fn find_thebibliography(text: &str) -> Vec<&str> {
+    let mut result = vec![];
+    let mut sub = text;
+    let start_token = "\\begin{thebibliography}";
+    let end_token = "\\end{thebibliography}";
+    loop {
+        let tok_s = sub.find(start_token);
+        if let Some(idx) = tok_s {
+            sub = &sub[idx..];
+            let tok_e = sub.find(end_token);
+            if let Some(idx_se) = tok_e {
+                let idx_e = idx_se + end_token.len();
+                result.push(&sub[0..idx_e]);
+                sub = &sub[idx_e..];
+            }
+        } else {
+            break;
+        }
+    }
+    return result;
+}
+
+fn get_bibitems(text: &str) -> &str {
+    let start_token = "\\bibitem";
+    let end_token = "\\end{thebibliography}";
+    let tok_s = text.find(start_token).unwrap();
+    let tok_e = text.find(end_token).unwrap();
+    return &text[tok_s..tok_e];
 }

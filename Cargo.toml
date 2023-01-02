@@ -1,6 +1,6 @@
 [package]
 name = "latex-thebib"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 description = "Clean and sort legacy TeX bibliographies written using 'thebibliography' via the `refactor` sub-command. Compile BibTeX files to legacy `thebibliography` TeX code using the `compile` sub-command. Francesco Alemanno (2022)"

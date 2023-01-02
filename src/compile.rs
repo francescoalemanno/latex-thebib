@@ -32,20 +32,13 @@ struct Entry<'a> {
 
 pub fn run_compile(cli: &CompileCli) {
     if let Some(data) = utils::read_tex_stripped(&cli.file) {
-        //println!("{}", data);
-        let list = data
-            .split("@article")
-            .filter(|s| s.chars().take(1).next() == Some('{'))
-            .map(|s| trim_pars(&s.trim().replace("\n", "").replace("\t", "")))
-            .collect::<Vec<String>>();
-
-        let bib = get_bibliography(&list);
+        let bib = parse_bibliography(&data);
         let size = utils::thebibliography_size(bib.len());
         let mut formatted = format!("\\begin{{thebibliography}}{{{size}}}\n\n");
         for b in bib.into_iter() {
             let a = &b.params.get("author").unwrap();
             let authors = format_all_author(a);
-            let t = format!("{{\\em {}}},",&b.params.get("title").unwrap());
+            let t = format!("\\textit{{{}}},", &b.params.get("title").unwrap());
             let y = format!("({})", &b.params.get("year").unwrap());
 
             let p = if let Some(tmp) = &b.params.get("publisher") {
@@ -65,9 +58,14 @@ pub fn run_compile(cli: &CompileCli) {
             elements.push(&t);
             elements.push(&j);
             elements.push(&vol_fmt);
-            if cli.publisher {elements.push(&p);}
+            if cli.publisher {
+                elements.push(&p);
+            }
             elements.push(&y);
-            formatted.push_str(&format!("{}\n\n", utils::clean_bib_text(&elements.join(" "))));
+            formatted.push_str(&format!(
+                "{}\n\n",
+                utils::clean_bib_text(&elements.join(" "))
+            ));
         }
         formatted.push_str("\\end{thebibliography}");
         if cli.output != DEF_OUTPUT {
@@ -116,11 +114,11 @@ fn format_all_author(a: &str) -> String {
     if authors.len() == 0 {
         return "".to_owned();
     } else if authors.len() == 1 {
-        return authors[0].to_owned();
+        return format!("\\textsc{{{}}}",authors[0]);
     }
     let a1 = &authors[0..authors.len() - 1].join(", ");
     let a2 = &authors[authors.len() - 1];
-    return format!("{} \\& {}", a1, a2);
+    return format!("\\textsc{{{} \\& {}}}", a1, a2);
 }
 
 fn format_author(auth: Vec<&str>) -> String {
@@ -141,91 +139,78 @@ fn format_author(auth: Vec<&str>) -> String {
     fmt_auth
 }
 
-fn get_bibliography<'a>(list: &'a Vec<String>) -> Vec<Entry<'a>> {
-    let mut bib = Vec::<Entry>::new();
-    for l in list.iter() {
-        let (key, mut rest) = get_key_name(l);
-        let mut entry = Entry {
-            name: key,
-            params: HashMap::new(),
-        };
-        while rest.len() > 0 {
-            let (label, body, rest2) = get_param(rest);
-            entry.params.insert(label, body);
-            rest = rest2;
-        }
-        bib.push(entry);
-    }
-    bib
-}
-
-fn trim_pars(mut s: &str) -> String {
-    s = s.trim();
+fn trim_pars(sa: &str) -> &str {
+    let mut s = sa.trim();
     if s.len() > 2 && &s[0..1] == "{" && &s[s.len() - 1..] == "}" {
         s = &s[1..s.len() - 1];
     }
-    return s.to_owned();
+    return s;
 }
 
-fn get_param(rest: &str) -> (&str, &str, &str) {
-    let (label, rest) = get_param_name(&rest);
-    let (body, rest) = get_param_body(&rest);
-    (label, body, rest)
+fn find_closing_token(sub: &str, tok: u8, at: isize) -> Option<usize> {
+    let mut l: isize = 0;
+    for (i, &c) in sub.as_bytes().into_iter().enumerate() {
+        if l == at && c == tok {
+            return Some(i);
+        }
+        if c == b'{' {
+            l += 1;
+        }
+        if c == b'}' {
+            l -= 1;
+        }
+    }
+    return None;
 }
 
-fn get_param_body(rest: &str) -> (&str, &str) {
-    let mut pos = 0;
-    let mut pars = 0;
-    let mut has_pars = false;
-    for (i, c) in rest.chars().enumerate() {
-        if c == '{' {
-            pars += 1;
-            has_pars = true;
-        }
-        if c == '}' {
-            pars -= 1;
-        }
-        if c == ',' && pars == 0 {
-            pos = i;
-            break;
-        }
-        if i == rest.len() - 1 {
-            pos = i + 1;
-            break;
-        }
+fn get_bibentry_raw(data: &str) -> Option<(&str, &str, &str, &str)> {
+    let o = data.find("@");
+    if o.is_none() {
+        return None;
     }
-    let mut body = rest[0..pos].trim();
-    if has_pars {
-        body = &body[1..body.len() - 1]
-    }
-    let mut rest = rest[pos..].trim();
-    if rest.len() > 0 {
-        rest = &rest[1..];
-    }
-    (body, rest)
+    let mut rest = &data[o.unwrap() + 1..];
+
+    let o = rest
+        .find("{")
+        .expect("found \"@\", and expected to find \"{\" after entry type.");
+    let etype = &rest[0..o].trim();
+    rest = &rest[o + 1..];
+
+    let o = rest
+        .find(",")
+        .expect("found \"{\", and expected to find \",\" after article keyname.");
+    let keyname = &rest[0..o].trim();
+    rest = &rest[o + 1..];
+
+    let o = find_closing_token(rest, b'}', 0).expect("expected to find bibentry closing brace.");
+    let fields = &rest[0..o].trim();
+    rest = &rest[o + 1..];
+
+    return Some((rest, etype, keyname, fields));
 }
 
-fn get_param_name(mut rest: &str) -> (&str, &str) {
-    let mut pos = 0;
-    for (i, c) in rest.chars().enumerate() {
-        if c == '=' {
-            pos = i;
-            break;
-        }
-    }
-    let label = &rest[0..pos].trim();
-    rest = &rest[pos + 1..].trim();
-    (label, rest)
-}
+fn parse_bibliography<'a>(data: &'a str) -> Vec<Entry<'a>> {
+    let mut entries = vec![];
+    let mut sub = data;
 
-fn get_key_name(rem: &str) -> (&str, &str) {
-    let mut pos = 0;
-    for (i, c) in rem.chars().enumerate() {
-        if c == ',' {
-            pos = i;
-            break;
+    while let Some((rest, _, keyname, fields_s)) = get_bibentry_raw(sub) {
+        let mut entry = Entry {
+            name: keyname,
+            params: HashMap::new(),
+        };
+        sub = rest;
+        let mut fields = fields_s;
+        while let Some(e) = fields.find("=") {
+            let fieldname = &fields[0..e].trim();
+            fields = &fields[e + 1..];
+            let f = find_closing_token(fields, b',', 0).unwrap_or(fields.len());
+            let value = trim_pars(&fields[0..f].trim());
+            if f < fields.len() {
+                fields = &fields[f + 1..];
+            }
+            let _ = entry.params.insert(fieldname, value);
         }
+        entries.push(entry);
     }
-    let key = &rem[0..pos];
-    return (key, &rem[pos + 1..]);
+    return entries;
 }

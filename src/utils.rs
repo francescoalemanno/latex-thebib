@@ -14,7 +14,7 @@ pub fn read_tex_stripped(fname: &str) -> Option<String> {
             .filter(|x| x.len() == 0 || x.chars().nth(0).unwrap() != '%')
             .map(|s| s.split('%').collect::<Vec<&str>>()[0].trim())
             .collect::<Vec<&str>>();
-        let data = dedup_token(&lines.join("\n"), "\n",3);
+        let data = dedup_token(&lines.join("\n"), "\n", 3);
         return Some(data.replace(STR_PROTECT, "\\%"));
     }
     return None;
@@ -93,7 +93,6 @@ pub fn write_file(n_fname: String, contents: &String) {
     file.write_all(contents.as_bytes()).unwrap();
 }
 
-
 pub fn clean_bib_text(s: &str) -> String {
     let mut ns = s.to_owned();
     loop {
@@ -111,7 +110,7 @@ pub fn clean_bib_text(s: &str) -> String {
     return ns;
 }
 
-pub fn dedup_token(s: &str, token: &str, reps:usize) -> String {
+pub fn dedup_token(s: &str, token: &str, reps: usize) -> String {
     let mut ns = s.to_owned();
     let mut ds = token.to_owned();
     let mut ts = "".to_owned();
@@ -120,7 +119,7 @@ pub fn dedup_token(s: &str, token: &str, reps:usize) -> String {
         ts.push_str(token);
     }
     loop {
-        let ps = ns.replace(&ds,&ts);
+        let ps = ns.replace(&ds, &ts);
         if ps == ns {
             break;
         }

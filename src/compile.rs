@@ -21,6 +21,9 @@ pub struct CompileCli {
     #[arg(short, long, default_value_t = false)]
     /// add "Publisher" segment to each `bibitem`.
     publisher: bool,
+    #[arg(short, long, default_value_t = false)]
+    /// sort entries by year, most recent first.
+    sort: bool,
 }
 
 type StrMap<'a> = HashMap<&'a str, &'a str>;
@@ -29,10 +32,16 @@ struct Entry<'a> {
     name: &'a str,
     params: StrMap<'a>,
 }
-
 pub fn run_compile(cli: &CompileCli) {
     if let Some(data) = utils::read_tex_stripped(&cli.file) {
-        let bib = parse_bibliography(&data);
+        let mut bib = parse_bibliography(&data);
+        if cli.sort {
+            bib.sort_by(|a, b| {
+                let ya = &a.params.get("year").unwrap().parse::<usize>().unwrap();
+                let yb = &b.params.get("year").unwrap().parse::<usize>().unwrap();
+                yb.partial_cmp(ya).unwrap()
+            });
+        }
         let size = utils::thebibliography_size(bib.len());
         let mut formatted = format!("\\begin{{thebibliography}}{{{size}}}\n\n");
         for b in bib.into_iter() {
@@ -139,14 +148,6 @@ fn format_author(auth: Vec<&str>) -> String {
     fmt_auth
 }
 
-fn trim_pars(sa: &str) -> &str {
-    let mut s = sa.trim();
-    if s.len() > 2 && &s[0..1] == "{" && &s[s.len() - 1..] == "}" {
-        s = &s[1..s.len() - 1];
-    }
-    return s;
-}
-
 fn find_closing_token(sub: &str, tok: u8, at: isize) -> Option<usize> {
     let mut l: isize = 0;
     for (i, &c) in sub.as_bytes().into_iter().enumerate() {
@@ -189,14 +190,14 @@ fn get_bibentry_raw(data: &str) -> Option<(&str, &str, &str, &str)> {
     return Some((rest, etype, keyname, fields));
 }
 
-fn parse_bibliography<'a>(data: &'a str) -> Vec<Entry<'a>> {
+fn parse_bibliography<'a>(data: &str) -> Vec<Entry> {
     let mut entries = vec![];
     let mut sub = data;
 
     while let Some((rest, _, keyname, fields_s)) = get_bibentry_raw(sub) {
         let mut entry = Entry {
             name: keyname,
-            params: HashMap::new(),
+            params: StrMap::new(),
         };
         sub = rest;
         let mut fields = fields_s;
@@ -204,7 +205,7 @@ fn parse_bibliography<'a>(data: &'a str) -> Vec<Entry<'a>> {
             let fieldname = &fields[0..e].trim();
             fields = &fields[e + 1..];
             let f = find_closing_token(fields, b',', 0).unwrap_or(fields.len());
-            let value = trim_pars(&fields[0..f].trim());
+            let value = utils::trim_braces(&fields[0..f].trim());
             if f < fields.len() {
                 fields = &fields[f + 1..];
             }

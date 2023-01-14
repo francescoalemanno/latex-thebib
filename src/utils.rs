@@ -135,3 +135,11 @@ pub fn thebibliography_size(biblen: usize) -> usize {
     }
     return size;
 }
+
+pub fn trim_braces(sa: &str) -> &str {
+    let mut s = sa.trim();
+    if s.len() > 2 && &s[0..1] == "{" && &s[s.len() - 1..] == "}" {
+        s = &s[1..s.len() - 1];
+    }
+    return s.trim();
+}

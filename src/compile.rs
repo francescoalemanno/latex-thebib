@@ -24,6 +24,12 @@ pub struct CompileCli {
     #[arg(short, long, default_value_t = false)]
     /// sort entries by year, most recent first.
     sort: bool,
+    #[arg(short, long, default_value_t = false)]
+    /// compile as a list, not as a bibliography
+    aslist: bool,
+    #[arg(short, long, default_value = "")]
+    /// add a prefix to each cite label
+    cite_prefix: String,
 }
 
 type StrMap<'a> = HashMap<&'a str, &'a str>;
@@ -43,8 +49,13 @@ pub fn run_compile(cli: &CompileCli) {
             });
         }
         let size = utils::thebibliography_size(bib.len());
-        let mut formatted = format!("\\begin{{thebibliography}}{{{size}}}\n\n");
+        let mut formatted = if cli.aslist {
+            format!("\\begin{{enumerate}}[label=\\textnormal{{[\\arabic*]}}]\n")
+        } else {
+            format!("\\begin{{thebibliography}}{{{size}}}\n\n")
+        };
         for b in bib.into_iter() {
+            let citename = format!("{}{}", cli.cite_prefix,b.name);
             let a = &b.params.get("author").unwrap();
             let authors = format_all_author(a);
             let t = format!("\\textit{{{}}},", &b.params.get("title").unwrap());
@@ -60,7 +71,12 @@ pub fn run_compile(cli: &CompileCli) {
 
             let vol_fmt = format_volume(&b);
 
-            let bibkey = format!("\\bibitem{{{}}}", b.name);
+            let bibkey = if cli.aslist {
+                format!("\\item\\label{{{}}} ", citename)
+            } else {
+                format!("\\bibitem{{{}}}", citename)
+            };
+
             let mut elements: Vec<&str> = vec![];
             elements.push(&bibkey);
             elements.push(&authors);
@@ -76,7 +92,11 @@ pub fn run_compile(cli: &CompileCli) {
                 utils::clean_bib_text(&elements.join(" "))
             ));
         }
-        formatted.push_str("\\end{thebibliography}");
+        if cli.aslist {
+            formatted.push_str("\\end{enumerate}");
+        } else {
+            formatted.push_str("\\end{thebibliography}");
+        }
         if cli.output != DEF_OUTPUT {
             utils::write_file(cli.output.to_owned(), &formatted);
         } else {

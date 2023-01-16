@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
-mod utils;
 mod compile;
 mod refactor;
+mod utils;
 #[derive(Parser)]
 #[command(author, version, about)]
 #[command(propagate_version = true)]

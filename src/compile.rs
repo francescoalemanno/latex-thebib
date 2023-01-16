@@ -50,12 +50,12 @@ pub fn run_compile(cli: &CompileCli) {
         }
         let size = utils::thebibliography_size(bib.len());
         let mut formatted = if cli.aslist {
-            format!("\\begin{{enumerate}}[label=\\textnormal{{[\\arabic*]}}]\n")
+            format!("\\begin{{enumerate}}\n")
         } else {
             format!("\\begin{{thebibliography}}{{{size}}}\n\n")
         };
-        for b in bib.into_iter() {
-            let citename = format!("{}{}", cli.cite_prefix,b.name);
+        for (n, b) in bib.into_iter().enumerate() {
+            let citename = format!("{}{}", cli.cite_prefix, b.name);
             let a = &b.params.get("author").unwrap();
             let authors = format_all_author(a);
             let t = format!("\\textit{{{}}},", &b.params.get("title").unwrap());
@@ -72,7 +72,7 @@ pub fn run_compile(cli: &CompileCli) {
             let vol_fmt = format_volume(&b);
 
             let bibkey = if cli.aslist {
-                format!("\\item\\label{{{}}} ", citename)
+                format!("\\item[({})] ", n + 1)
             } else {
                 format!("\\bibitem{{{}}}", citename)
             };
@@ -143,7 +143,7 @@ fn format_all_author(a: &str) -> String {
     if authors.len() == 0 {
         return "".to_owned();
     } else if authors.len() == 1 {
-        return format!("\\textsc{{{}}}",authors[0]);
+        return format!("\\textsc{{{}}}", authors[0]);
     }
     let a1 = &authors[0..authors.len() - 1].join(", ");
     let a2 = &authors[authors.len() - 1];

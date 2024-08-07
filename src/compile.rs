@@ -7,7 +7,7 @@
 
 use crate::utils;
 use clap::Args;
-use std::collections::HashMap;
+use std::{collections::HashMap, usize};
 pub const DEF_OUTPUT: &str = "print to stdout.";
 
 #[derive(Args)]
@@ -185,25 +185,40 @@ fn find_closing_token(sub: &str, tok: u8, at: isize) -> Option<usize> {
 }
 
 fn get_bibentry_raw(data: &str) -> Option<(&str, &str, &str, &str)> {
+    let max_value = usize::max_value();
+    let max_len: usize = 100;
     let o = data.find("@");
     if o.is_none() {
         return None;
     }
     let mut rest = &data[o.unwrap() + 1..];
 
-    let o = rest
-        .find("{")
-        .expect("found \"@\", and expected to find \"{\" after entry type.");
+    let o = rest.find("{").unwrap_or(max_value);
+    if o == max_value {
+        let lim = rest.bytes().len().min(max_len);
+        println!("{}", &rest[0..lim]);
+        panic!("Parse error: found \"@\", and expected to find closing brace after entry type.")
+    }
     let etype = &rest[0..o].trim();
     rest = &rest[o + 1..];
 
-    let o = rest
-        .find(",")
-        .expect("found \"{\", and expected to find \",\" after article keyname.");
+    let o = rest.find(",").unwrap_or(max_value);
+
+    if o == max_value {
+        let lim = rest.bytes().len().min(max_len);
+        println!("{} {}", etype, &rest[0..lim]);
+        panic!(
+            "Parse error: found opening brace, and expected to find \",\" after article keyname."
+        )
+    }
     let keyname = &rest[0..o].trim();
     rest = &rest[o + 1..];
-
-    let o = find_closing_token(rest, b'}', 0).expect("expected to find bibentry closing brace.");
+    let o = find_closing_token(rest, b'}', 0).unwrap_or(max_value);
+    if o == max_value {
+        let lim = rest.bytes().len().min(max_len);
+        println!("{} {} {}", etype, keyname, &rest[0..lim]);
+        panic!("Parse error: expected final closing brace for bibitem.")
+    }
     let fields = &rest[0..o].trim();
     rest = &rest[o + 1..];
 
@@ -230,6 +245,16 @@ fn parse_bibliography<'a>(data: &str) -> Vec<Entry> {
                 fields = &fields[f + 1..];
             }
             let _ = entry.params.insert(fieldname, value);
+        }
+        if !entry.params.contains_key("year")
+            || !entry.params.contains_key("title")
+            || !entry.params.contains_key("author")
+        {
+            println!(
+                "%% Entry error: entry \"{}\" is missing fundamental fields (author, title, year).",
+                entry.name
+            );
+            continue;
         }
         entries.push(entry);
     }
